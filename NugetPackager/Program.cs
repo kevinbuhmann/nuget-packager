@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Vstack.Extensions;
 
 namespace NugetPackager
 {
@@ -10,6 +6,7 @@ namespace NugetPackager
     {
         public static void Main(string[] args)
         {
+            args.ValidateNotNullParameter(nameof(args));
         }
     }
 }
