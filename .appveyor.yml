@@ -1,0 +1,11 @@
+version: 1.0.{build}
+clone_folder: C:\projects\kevinphelps\nuget-packager
+clone_script:
+- git clone -q --depth=1 https://github.com/vintage-software/vstack.git C:\projects\vintage-software\vstack
+- git clone -q --depth=1 --branch=latest https://github.com/vintage-software/vstack-extensions.git C:\projects\vintage-software\vstack-extensions
+- git clone -q --depth=1 --branch=%APPVEYOR_REPO_BRANCH% https://github.com/kevinphelps/nuget-packager.git C:\projects\kevinphelps\nuget-packager
+before_build:
+- nuget restore C:\projects\vintage-software\vstack-extensions\Vstack.Extensions.sln
+- nuget restore C:\projects\kevinphelps\nuget-packager\NugetPackager.sln
+build:
+  verbosity: minimal
