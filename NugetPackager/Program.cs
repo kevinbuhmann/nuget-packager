@@ -12,7 +12,7 @@ namespace NugetPackager
         {
             args.ValidateNotNullParameter(nameof(args));
 
-            Console.WindowWidth = 150;
+            Console.WindowWidth = 180;
 
             string oldTitle = Console.Title;
             Console.Title = ApplicationName;

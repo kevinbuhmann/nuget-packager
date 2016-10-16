@@ -14,7 +14,7 @@ namespace NugetPackager
         public static void PackageProjects(string hubSolutionFilePath, string version)
         {
             IEnumerable<string> projectFilePaths = GetProjects(hubSolutionFilePath)
-                .Select(project => project.FilePath)
+                .Select(proj => proj.FilePath)
                 .ToList();
 
             IEnumerable<string> solutionFilePaths = GetSolutionFilePaths(projectFilePaths);
@@ -93,24 +93,23 @@ namespace NugetPackager
 
         private static void NugetPack(IEnumerable<string> solutionFilePaths, string version)
         {
+            List<string> packages = new List<string>();
+
             foreach (string solutionFilePath in solutionFilePaths)
             {
                 string solutionName = Path.GetFileNameWithoutExtension(solutionFilePath);
-                Project mainProject = GetProjects(solutionFilePath)
-                    .FirstOrDefault(project => project.Name == solutionName);
+                IEnumerable<Project> projects = GetProjects(solutionFilePath);
 
-                if (mainProject != null)
+                Project project = projects
+                    .FirstOrDefault(proj => proj.Name == solutionName);
+
+                if (project != null)
                 {
-                    if (mainProject.ProjectReferences.Any())
-                    {
-                        Console.WriteLine($"{mainProject.Name} has unresolved local project references.");
-                    }
-                    else
-                    {
-                        UpdateAssemblyVersion(mainProject, version);
-                        MSBuild(solutionFilePath);
-                        NugetPack(mainProject.FilePath);
-                    }
+                    UpdateAssemblyVersion(project, version);
+                    MSBuild(solutionFilePath);
+                    NugetPack(project.FilePath);
+
+                    packages.Add(project.Name);
 
                     Console.WriteLine();
                 }
@@ -124,7 +123,7 @@ namespace NugetPackager
         private static void UpdateAssemblyVersion(Project project, string version)
         {
             Document assemblyInfoDocument = project.Documents
-                .FirstOrDefault(document => document.Name == "AssemblyInfo.cs");
+                .FirstOrDefault(doc => doc.Name == "AssemblyInfo.cs");
 
             if (assemblyInfoDocument != null)
             {
@@ -145,7 +144,7 @@ namespace NugetPackager
             string solutionPath = Path.GetDirectoryName(solutionFilePath);
             string solutionFileName = Path.GetFileName(solutionFilePath);
 
-            CommandLine.Run(solutionPath, "msbuild", $"{solutionFileName} /p:Configuration=Release", 5, TimeUnit.Minute);
+            CommandLine.Run(solutionPath, "msbuild", $"{solutionFileName} /t:Clean,Build /p:Configuration=Release", 5, TimeUnit.Minute);
         }
 
         private static void NugetPack(string projectFilePath)
@@ -153,7 +152,7 @@ namespace NugetPackager
             string projectPath = Path.GetDirectoryName(projectFilePath);
             string projectFileName = Path.GetFileName(projectFilePath);
 
-            CommandLine.Run(projectPath, "nuget", $"pack {projectFileName} -Prop Configuration=Release", 5, TimeUnit.Minute);
+            CommandLine.Run(projectPath, "nuget", $"pack {projectFileName} -IncludeReferencedProjects -Prop Configuration=Release", 5, TimeUnit.Minute);
         }
 
         private static void RevertChanges(IEnumerable<string> solutionFilePaths)
@@ -170,12 +169,5 @@ namespace NugetPackager
 
             Console.WriteLine();
         }
-
-        ////private static bool HasNuspec(string projectPath)
-        ////{
-        ////    string projectFileName = Path.GetFileName(projectPath);
-        ////    string nuspecFilePath = Path.Combine(projectPath, $"{projectFileName}.nuspec");
-        ////    return File.Exists(nuspecFilePath);
-        ////}
     }
 }
