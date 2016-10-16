@@ -25,6 +25,7 @@ namespace NugetPackager
                 .ToList();
 
             EnsureReposAreCleanAndUpToDate(solutionPaths, branch);
+            Clean(solutionFilePaths);
             NugetRestore(solutionFilePaths);
             NugetPack(solutionFilePaths, version);
 
@@ -99,6 +100,19 @@ namespace NugetPackager
             Console.WriteLine();
         }
 
+        private static void Clean(IEnumerable<string> solutionFilePaths)
+        {
+            foreach (string solutionFilePath in solutionFilePaths)
+            {
+                string solutionPath = Path.GetDirectoryName(solutionFilePath);
+                string solutionFileName = Path.GetFileName(solutionFilePath);
+
+                CommandLine.Run(solutionPath, "msbuild", $"{solutionFileName} /t:Clean /p:Configuration=Release", 1, TimeUnit.Minute);
+            }
+
+            Console.WriteLine();
+        }
+
         private static void NugetRestore(IEnumerable<string> solutionFilePaths)
         {
             foreach (string solutionFilePath in solutionFilePaths)
@@ -167,7 +181,7 @@ namespace NugetPackager
             string solutionPath = Path.GetDirectoryName(solutionFilePath);
             string solutionFileName = Path.GetFileName(solutionFilePath);
 
-            CommandLine.Run(solutionPath, "msbuild", $"{solutionFileName} /t:Clean,Build /p:Configuration=Release", 5, TimeUnit.Minute);
+            CommandLine.Run(solutionPath, "msbuild", $"{solutionFileName} /t:Build /p:Configuration=Release", 5, TimeUnit.Minute);
         }
 
         private static void NugetPack(string projectFilePath)
