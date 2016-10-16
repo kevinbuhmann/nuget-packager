@@ -28,8 +28,8 @@ namespace NugetPackager
             Clean(solutionFilePaths);
             NugetRestore(solutionFilePaths);
             NugetPack(solutionFilePaths, version);
-
-            // commit AssemblyInfo.cs changes
+            NugetPush(solutionFilePaths, version);
+            CommitTagAndPush(solutionPaths, version);
         }
 
         private static IEnumerable<Project> GetProjects(string solutionFilePath)
@@ -128,11 +128,12 @@ namespace NugetPackager
 
         private static void NugetPack(IEnumerable<string> solutionFilePaths, string version)
         {
-            List<string> packages = new List<string>();
-
             foreach (string solutionFilePath in solutionFilePaths)
             {
+                string solutionPath = Path.GetDirectoryName(solutionFilePath);
+                string solutionFileName = Path.GetFileName(solutionFilePath);
                 string solutionName = Path.GetFileNameWithoutExtension(solutionFilePath);
+
                 IEnumerable<Project> projects = GetProjects(solutionFilePath);
 
                 Project project = projects
@@ -140,12 +141,13 @@ namespace NugetPackager
 
                 if (project != null)
                 {
+                    string projectPath = Path.GetDirectoryName(project.FilePath);
+                    string projectFileName = Path.GetFileName(project.FilePath);
+
                     UpdateAssemblyVersion(project, version);
-                    MSBuild(solutionFilePath);
-                    NugetPack(project.FilePath);
 
-                    packages.Add(project.Name);
-
+                    CommandLine.Run(solutionPath, "msbuild", $"{solutionFileName} /t:Build /p:Configuration=Release", 5, TimeUnit.Minute);
+                    CommandLine.Run(projectPath, "nuget", $"pack {projectFileName} -IncludeReferencedProjects -Prop Configuration=Release", 5, TimeUnit.Minute);
                     Console.WriteLine();
                 }
                 else
@@ -169,6 +171,10 @@ namespace NugetPackager
                 File.WriteAllText(assemblyInfoDocument.FilePath, code, Encoding.UTF8);
 
                 Console.WriteLine($"Updated {project.Name} version to {version}.");
+
+                string solutionPath = Path.GetDirectoryName(project.Solution.FilePath);
+                string relativeAssemblyInfoPath = assemblyInfoDocument.FilePath.Replace($"{solutionPath}{Path.DirectorySeparatorChar}", string.Empty);
+                CommandLine.Run(solutionPath, "git", $"add {relativeAssemblyInfoPath}", 1, TimeUnit.Minute);
             }
             else
             {
@@ -176,20 +182,31 @@ namespace NugetPackager
             }
         }
 
-        private static void MSBuild(string solutionFilePath)
+        private static void NugetPush(IEnumerable<string> solutionFilePaths, string version)
         {
-            string solutionPath = Path.GetDirectoryName(solutionFilePath);
-            string solutionFileName = Path.GetFileName(solutionFilePath);
+            foreach (string solutionFilePath in solutionFilePaths)
+            {
+                string solutionPath = Path.GetDirectoryName(solutionFilePath);
+                string solutionName = Path.GetFileNameWithoutExtension(solutionFilePath);
+                string projectPath = Path.Combine(solutionPath, solutionName);
+                string nupkgFileName = $"{solutionName}.{version}.nupkg";
 
-            CommandLine.Run(solutionPath, "msbuild", $"{solutionFileName} /t:Build /p:Configuration=Release", 5, TimeUnit.Minute);
+                CommandLine.Run(projectPath, "nuget", $"push {nupkgFileName} -Source https://www.nuget.org/api/v2/package", 5, TimeUnit.Minute);
+            }
+
+            Console.WriteLine();
         }
 
-        private static void NugetPack(string projectFilePath)
+        private static void CommitTagAndPush(IEnumerable<string> solutionPaths, string version)
         {
-            string projectPath = Path.GetDirectoryName(projectFilePath);
-            string projectFileName = Path.GetFileName(projectFilePath);
+            foreach (string solutionPath in solutionPaths)
+            {
+                CommandLine.Run(solutionPath, "git", $"commit -m \"version {version}\"", 1, TimeUnit.Minute);
+                CommandLine.Run(solutionPath, "git", $"tag -a v{version} -m \"version {version}\"", 1, TimeUnit.Minute);
+                CommandLine.Run(solutionPath, "git", "push --follow-tags", 1, TimeUnit.Minute);
 
-            CommandLine.Run(projectPath, "nuget", $"pack {projectFileName} -IncludeReferencedProjects -Prop Configuration=Release", 5, TimeUnit.Minute);
+                Console.WriteLine();
+            }
         }
     }
 }
