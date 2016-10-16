@@ -9,3 +9,4 @@ before_build:
 - nuget restore C:\projects\kevinphelps\nuget-packager\NugetPackager.sln
 build:
   verbosity: minimal
+configuration: Release
