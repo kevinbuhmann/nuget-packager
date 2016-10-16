@@ -42,9 +42,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="CommandLine.cs" />
+    <Compile Include="ExpectationFailedException.cs" />
     <Compile Include="CommandLineException.cs" />
     <Compile Include="CommandLineResult.cs" />
-    <Compile Include="GitUtility.cs" />
     <Compile Include="Packager.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -58,6 +58,10 @@
     <ProjectReference Include="..\..\..\vintage-software\vstack-extensions\Vstack.Extensions\Vstack.Extensions.csproj">
       <Project>{029ecbe3-6e0e-498e-80a7-bad385891c91}</Project>
       <Name>Vstack.Extensions</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\git-compare\GitCompare\GitCompare.csproj">
+      <Project>{729da53a-892f-422d-88ae-43202210e96b}</Project>
+      <Name>GitCompare</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
@@ -212,6 +216,9 @@
       <HintPath>..\packages\System.Xml.XPath.XDocument.4.0.1\lib\net46\System.Xml.XPath.XDocument.dll</HintPath>
       <Private>True</Private>
     </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <CodeAnalysisDictionary Include="CustomDictionary.xml" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\Microsoft.Bcl.Build.1.0.21\build\Microsoft.Bcl.Build.targets" Condition="Exists('..\packages\Microsoft.Bcl.Build.1.0.21\build\Microsoft.Bcl.Build.targets')" />

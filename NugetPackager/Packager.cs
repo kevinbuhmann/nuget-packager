@@ -1,4 +1,5 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using GitCompare;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
 using System;
 using System.Collections.Generic;
@@ -11,7 +12,7 @@ namespace NugetPackager
 {
     public static class Packager
     {
-        public static void PackageProjects(string hubSolutionFilePath, string version)
+        public static void PackageProjects(string hubSolutionFilePath, string version, string branch)
         {
             IEnumerable<string> projectFilePaths = GetProjects(hubSolutionFilePath)
                 .Select(proj => proj.FilePath)
@@ -19,16 +20,21 @@ namespace NugetPackager
 
             IEnumerable<string> solutionFilePaths = GetSolutionFilePaths(projectFilePaths);
 
-            CheckForUncommittedChanges(solutionFilePaths);
+            IEnumerable<string> solutionPaths = GetSolutionFilePaths(projectFilePaths)
+                .Select(solutionFilePath => Path.GetDirectoryName(solutionFilePath))
+                .ToList();
+
+            EnsureReposAreCleanAndUpToDate(solutionPaths, branch);
             NugetRestore(solutionFilePaths);
             NugetPack(solutionFilePaths, version);
 
             // commit AssemblyInfo.cs changes
-            RevertChanges(solutionFilePaths);
         }
 
         private static IEnumerable<Project> GetProjects(string solutionFilePath)
         {
+            Console.WriteLine($"Getting projects in {solutionFilePath}.");
+
             using (MSBuildWorkspace workspace = MSBuildWorkspace.Create())
             {
                 Solution solution = workspace.OpenSolutionAsync(solutionFilePath).Result;
@@ -57,21 +63,36 @@ namespace NugetPackager
 
             if (!File.Exists(projectSolutionFilePath))
             {
-                throw new Exception($"Unable to find solution path for {projectFilePath}");
+                throw new ExpectationFailedException($"Solution for project {projectName} does not exist at {projectSolutionFilePath}.");
             }
 
             return projectSolutionFilePath;
         }
 
-        private static void CheckForUncommittedChanges(IEnumerable<string> solutionFilePaths)
+        private static void EnsureReposAreCleanAndUpToDate(IEnumerable<string> solutionPaths, string branch)
         {
-            foreach (string solutionFilePath in solutionFilePaths)
+            foreach (string solutionPath in solutionPaths)
             {
-                string solutionPath = Path.GetDirectoryName(solutionFilePath);
+                Console.WriteLine($"Checking status of {solutionPath}.");
 
-                if (GitUtility.IsGitRepo(solutionPath) && GitUtility.HasUncommittedChanges(solutionPath))
+                if (GitUtility.IsGitRepo(solutionPath))
                 {
-                    throw new Exception($"{solutionPath} has uncommitted changes.");
+                    string currentBranch = GitUtility.GetCurrentBranch(solutionPath);
+                    RepoStatus repoStatus = GitUtility.GetRepoStatus(solutionPath);
+
+                    if (currentBranch != branch)
+                    {
+                        throw new ExpectationFailedException($"{solutionPath} is checked out to {currentBranch}, expected {branch}.");
+                    }
+
+                    if (repoStatus != RepoStatus.CleanAndUpToDate)
+                    {
+                        throw new ExpectationFailedException($"{solutionPath} is not clean and up to date: {repoStatus.ToStatusString()}.");
+                    }
+                }
+                else
+                {
+                    throw new ExpectationFailedException($"{solutionPath} is not a git repo.");
                 }
             }
 
@@ -115,15 +136,17 @@ namespace NugetPackager
                 }
                 else
                 {
-                    throw new Exception($"Unable to find main project in solution {solutionName}.");
+                    throw new ExpectationFailedException($"Solution {solutionName} does not contain a project named {solutionName}.");
                 }
             }
         }
 
         private static void UpdateAssemblyVersion(Project project, string version)
         {
+            string asseblyInfoFileName = "AssemblyInfo.cs";
+
             Document assemblyInfoDocument = project.Documents
-                .FirstOrDefault(doc => doc.Name == "AssemblyInfo.cs");
+                .FirstOrDefault(doc => doc.Name == asseblyInfoFileName);
 
             if (assemblyInfoDocument != null)
             {
@@ -135,7 +158,7 @@ namespace NugetPackager
             }
             else
             {
-                throw new Exception($"Unable to update {project.Name} version.");
+                throw new ExpectationFailedException($"Project {project.Name} does not contain a document named {asseblyInfoFileName}.");
             }
         }
 
@@ -153,21 +176,6 @@ namespace NugetPackager
             string projectFileName = Path.GetFileName(projectFilePath);
 
             CommandLine.Run(projectPath, "nuget", $"pack {projectFileName} -IncludeReferencedProjects -Prop Configuration=Release", 5, TimeUnit.Minute);
-        }
-
-        private static void RevertChanges(IEnumerable<string> solutionFilePaths)
-        {
-            foreach (string solutionFilePath in solutionFilePaths)
-            {
-                string solutionPath = Path.GetDirectoryName(solutionFilePath);
-
-                if (GitUtility.IsGitRepo(solutionPath))
-                {
-                    GitUtility.Revert(solutionPath);
-                }
-            }
-
-            Console.WriteLine();
         }
     }
 }

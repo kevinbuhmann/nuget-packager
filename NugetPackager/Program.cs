@@ -22,12 +22,13 @@ namespace NugetPackager
             bool success = false;
             string hubSolutionFilePath = args[0];
             string version = args[1];
+            string branch = args[2];
 
             if (hubSolutionFilePath.EndsWith(".sln") && File.Exists(hubSolutionFilePath))
             {
                 try
                 {
-                    Packager.PackageProjects(hubSolutionFilePath, version);
+                    Packager.PackageProjects(hubSolutionFilePath, version, branch);
                     success = true;
                 }
                 catch (CommandLineException e)
@@ -38,6 +39,11 @@ namespace NugetPackager
 
                     Console.WriteLine();
                     Console.WriteLine(message);
+                }
+                catch (ExpectationFailedException e)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine($"Expectation failed: {e.Message}");
                 }
                 catch (Exception e)
                 {
