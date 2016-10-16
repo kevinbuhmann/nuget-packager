@@ -153,7 +153,7 @@ namespace NugetPackager
             string projectPath = Path.GetDirectoryName(projectFilePath);
             string projectFileName = Path.GetFileName(projectFilePath);
 
-            CommandLine.Run(projectPath, "nuget", $"pack {projectFileName}", 5, TimeUnit.Minute);
+            CommandLine.Run(projectPath, "nuget", $"pack {projectFileName} -Prop Configuration=Release", 5, TimeUnit.Minute);
         }
 
         private static void RevertChanges(IEnumerable<string> solutionFilePaths)
